@@ -39,6 +39,8 @@ public class Main extends JFrame {
 	private JButton btnGravar;
 	private JButton btnExcluir;
 	private JButton btnNovo;
+	private JLabel lblQuant;
+	private JTextField textQuant;
 	/**
 	 * Launch the application.
 	 */
@@ -111,6 +113,7 @@ public class Main extends JFrame {
 				btnCancelar.setVisible(true);
 				textDescricao.setEditable(true);
 				btnGravar.setVisible(true);
+				textQuant.setEditable(true);
 				limparCampos();
 				textDescricao.requestFocus();
 			}
@@ -140,10 +143,15 @@ public class Main extends JFrame {
 				btnCancelar.setVisible(false);
 				btnConfirmarEdicao.setVisible(false);
 				btnNovo.setVisible(true);
-				editarProduto();
+				try {
+					editarProduto();
+				} catch (SQLException e1) {
+					// TODO Auto-generated catch block
+					e1.printStackTrace();
+				}
 			}
 		});
-		btnConfirmarEdicao.setBounds(433, 27, 85, 21);
+		btnConfirmarEdicao.setBounds(625, 27, 85, 21);
 		contentPane.add(btnConfirmarEdicao);
 		btnConfirmarEdicao.setVisible(false);
 		
@@ -154,14 +162,15 @@ public class Main extends JFrame {
 				btnExcluir.setVisible(false);
 				btnNovo.setVisible(false);
 				textDescricao.setEditable(true);
+				textQuant.setEditable(true);
 				btnEditar.setVisible(false);
 				btnConfirmarEdicao.setVisible(true);
-				btnCancelar.setBounds(433, 55, 85, 21);
+				btnCancelar.setBounds(625, 55, 85, 21);
 				btnCancelar.setVisible(true);
 			}
 		});
 		
-		btnEditar.setBounds(433, 27, 85, 21);
+		btnEditar.setBounds(625, 27, 85, 21);
 		contentPane.add(btnEditar);
 		btnEditar.setVisible(false);
 		btnGravar = new JButton("Gravar");
@@ -173,7 +182,12 @@ public class Main extends JFrame {
 					btnCancelar.setVisible(false);
 					btnGravar.setVisible(false);
 					btnNovo.setVisible(true);
-					gravarProduto();
+					try {
+						gravarProduto();
+					} catch (SQLException e1) {
+						// TODO Auto-generated catch block
+						e1.printStackTrace();
+					}
 				}
 
 			}
@@ -189,7 +203,12 @@ public class Main extends JFrame {
 				btnNovo.setVisible(true);
 				btnConfirmarEdicao.setVisible(false);
 				btnCancelar.setVisible(false);
-				excluirProduto();
+				try {
+					excluirProduto();
+				} catch (SQLException e1) {
+					// TODO Auto-generated catch block
+					e1.printStackTrace();
+				}
 			}
 		});
 		btnExcluir.setBounds(528, 83, 85, 21);
@@ -217,6 +236,17 @@ public class Main extends JFrame {
 		});
 		tabela_DB.setBounds(10, 144, 700, 246);
 		contentPane.add(tabela_DB);
+		
+		lblQuant = new JLabel("Quantidade:");
+		lblQuant.setFont(new Font("Tahoma", Font.PLAIN, 14));
+		lblQuant.setBounds(414, 21, 89, 29);
+		contentPane.add(lblQuant);
+		
+		textQuant = new JTextField();
+		textQuant.setEditable(false);
+		textQuant.setBounds(492, 28, 96, 19);
+		contentPane.add(textQuant);
+		textQuant.setColumns(10);
 
 
 		listarProduto();
@@ -232,15 +262,15 @@ public class Main extends JFrame {
 				JOptionPane.showMessageDialog(null, "Falha em Conectar o Banco de Dados");
 			} else {
 				st = conn.createStatement();
-				rs = st.executeQuery("select * from produto");
-				String[] colunasTabela = new String[] { "ID", "DESCRICAO", "POSICAO" };
+				rs = st.executeQuery("select * from produto p inner join estoque e on p.id = e.id");
+				String[] colunasTabela = new String[] { "ID", "DESCRICAO", "POSICAO", "QUANTIDADE" };
 				DefaultTableModel modeloTabela = new DefaultTableModel(null, colunasTabela);
-				modeloTabela.addRow(new String[] { "ID", "DESCRICAO", "CADASTRO" });
+				modeloTabela.addRow(new String[] { "ID", "DESCRICAO", "CADASTRO", "QUANTIDADE" });
 				if (rs != null) {
 					while (rs.next()) {
 
 						modeloTabela.addRow(new String[] { String.valueOf(rs.getInt("id")), rs.getString("descricao"),
-								rs.getString("data_cadastro") });
+								rs.getString("data_cadastro"), String.valueOf(rs.getInt("quantidade")) });
 					}
 				}
 				tabela_DB.setModel(modeloTabela);
@@ -264,19 +294,31 @@ public class Main extends JFrame {
 
 	}
 
-	private void gravarProduto() {// grava novo produto com base na descricao. id e data de cadastro são auto
+	private void gravarProduto() throws SQLException {// grava novo produto com base na descricao. id e data de cadastro são auto
 									// incremento e gerenciadas pelo banco de dados
 		Connection conn = null;
-		PreparedStatement st = null;
+		PreparedStatement ps = null;
+		Statement st = null;
 		try {
 			conn = DB.getConnection();
+			conn.setAutoCommit(false);
 			if (conn == null) {
 				JOptionPane.showMessageDialog(null, "Falha em Conectar o Banco de Dados");
 			} else {
-				st = conn.prepareStatement("INSERT INTO produto" + "(descricao, data_cadastro)" + "VALUES " + "(?, ?)");
-				st.setString(1, textDescricao.getText());
-				st.setString(2, null);
-				st.executeUpdate();
+				ps = conn.prepareStatement("INSERT INTO produto" + "(descricao, data_cadastro)" + "VALUES " + "(?, ?)", Statement.RETURN_GENERATED_KEYS);
+				ps.setString(1, textDescricao.getText());
+				ps.setString(2, null);
+				ps.executeUpdate();
+				ResultSet rs = ps.getGeneratedKeys();
+				int idUltimo = 0;
+				while (rs.next()) {
+					 idUltimo = rs.getInt(1);
+				}
+				Statement stmt = conn.createStatement();
+		        String query="insert into estoque(id,quantidade) values("
+		               +idUltimo+","+textQuant.getText()+")";
+		        stmt.executeUpdate(query);
+				conn.commit();
 				limparCampos();
 				desabilitarCampos();
 				listarProduto();
@@ -284,6 +326,7 @@ public class Main extends JFrame {
 
 		} catch (SQLException e) {
 			// TODO Auto-generated catch block
+			conn.rollback();
 			throw new DbException(e.getMessage());
 		} finally {
 			if (st != null) {
@@ -296,11 +339,12 @@ public class Main extends JFrame {
 		}
 
 	}
-	private void editarProduto() { // exclui produto selecionado com base no ID
+	private void editarProduto() throws SQLException { // exclui produto selecionado com base no ID
 		Connection conn = null;
 		PreparedStatement st = null;
 		try {
 			conn = DB.getConnection();
+			conn.setAutoCommit(false);
 			if (conn == null) {
 				JOptionPane.showMessageDialog(null, "Falha em Conectar o Banco de Dados");
 			} else {
@@ -310,6 +354,12 @@ public class Main extends JFrame {
 				st.setString(1, textDescricao.getText());
 				st.setInt(2, Integer.parseInt(textID.getText()));
 				st.executeUpdate();
+				Statement stmt = conn.createStatement();
+		        String query="UPDATE estoque " 
+						+ "SET quantidade = " + textQuant.getText()
+						+" WHERE " + "id = " + textID.getText();
+		        stmt.executeUpdate(query);
+				conn.commit();
 				limparCampos();
 				desabilitarCampos();
 				listarProduto();
@@ -317,6 +367,7 @@ public class Main extends JFrame {
 
 		} catch (SQLException e) {
 			// TODO Auto-generated catch block
+			conn.rollback();
 			throw new DbException(e.getMessage());
 		} finally {
 			if (st != null) {
@@ -329,17 +380,23 @@ public class Main extends JFrame {
 		}
 
 	}
-	private void excluirProduto() { // exclui produto selecionado com base no ID
+	private void excluirProduto() throws SQLException { // exclui produto selecionado com base no ID
 		Connection conn = null;
 		PreparedStatement st = null;
 		try {
 			conn = DB.getConnection();
+			conn.setAutoCommit(false);
 			if (conn == null) {
 				JOptionPane.showMessageDialog(null, "Falha em Conectar o Banco de Dados");
 			} else {
 				st = conn.prepareStatement("DELETE FROM produto " + "WHERE " + "id = ?");
 				st.setInt(1, Integer.parseInt(textID.getText()));
 				st.executeUpdate();
+				Statement stmt = conn.createStatement();
+		        String query="DELETE FROM estoque "
+						+"WHERE " + "id = " + textID.getText();
+		        stmt.executeUpdate(query);
+				conn.commit();
 				limparCampos();
 				desabilitarCampos();
 				listarProduto();
@@ -347,6 +404,7 @@ public class Main extends JFrame {
 
 		} catch (SQLException e) {
 			// TODO Auto-generated catch block
+			conn.rollback();
 			throw new DbException(e.getMessage());
 		} finally {
 			if (st != null) {
@@ -364,6 +422,7 @@ public class Main extends JFrame {
 		textDescricao.setEditable(false);
 		textID.setEditable(false);
 		textCAD.setEditable(false);
+		textQuant.setEditable(false);
 
 	}
 
@@ -381,6 +440,7 @@ public class Main extends JFrame {
 			textID.setText(tableModel.getValueAt(row, 0).toString());
 			textDescricao.setText(tableModel.getValueAt(row, 1).toString());
 			textCAD.setText(tableModel.getValueAt(row, 2).toString());
+			textQuant.setText(tableModel.getValueAt(row, 3).toString());
 		}
 	}
 
@@ -388,6 +448,7 @@ public class Main extends JFrame {
 		textDescricao.setText(null);
 		textID.setText(null);
 		textCAD.setText(null);
+		textQuant.setText(null);
 		btnEditar.setVisible(false);
 	}
 }
